@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package insta.comments;
+option go_package = "github.com/mariapetrova3009/insta-backend/proto/comments;comments";
+
+import "common.proto";
+
+service CommentService {
+  rpc CreateComment(CreateCommentRequest) returns (CreateCommentResponse);
+  rpc ListComments(ListCommentsRequest) returns (ListCommentsResponse);
+}
+
+message CreateCommentRequest {
+  string post_id = 1;
+  string text = 2;
+}
+
+message CreateCommentResponse {
+  insta.common.Comment comment = 1;
+}
+
+message ListCommentsRequest {
+  string post_id = 1;
+  insta.common.PageRequest page = 2;
+}
+
+message ListCommentsResponse {
+  repeated insta.common.Comment comments = 1;
+  insta.common.PageInfo page_info = 2;
+}

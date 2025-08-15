@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package insta.common;
+option go_package = "github.com/mariapetrova3009/insta-backend/proto/common;comon";
+
+import "google/protobuf/timestamp.proto";
+
+message Empty {}
+
+message Cursor {
+  string token = 1;
+}
+
+message PageRequest {
+  uint32 limit = 1;   
+  Cursor cursor = 2;  
+}
+
+message PageInfo {
+  Cursor next_cursor = 1;
+  bool has_more = 2;
+}
+
+message User {
+  string id = 1;
+  string email = 2;
+  string username = 3;
+  string bio = 4;
+  string avatar_path = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message Post {
+  string id = 1;
+  string author_id = 2;
+  string caption = 3;
+  string media_path = 4;
+  string mime = 5; 
+  int64 likes_count = 6;
+  int64 comments_count = 7;
+  google.protobuf.Timestamp created_at = 8;
+}
+
+message Comment {
+  string id = 1;
+  string post_id = 2;
+  string user_id = 3;
+  string text = 4;
+  google.protobuf.Timestamp created_at = 5;
+}

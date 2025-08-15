@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+
+package insta.identity;
+option go_package = "github.com/mariapetrova3009/insta-backend/proto/identity;identity";
+
+import "common.proto";
+
+service IdentityService {
+    rpc Register(RegisterRequest) returns (AuthResponse);
+    rpc Login(LoginRequest) returns (AuthResponse);
+    rpc GetProfile(GetProfileRequest) returns (GetProfileResponse);
+}
+
+message RegisterRequest {
+  string email = 1;
+  string username = 2;
+  string password = 3;
+  string bio = 4;
+}
+
+message AuthResponse {
+  string access_token = 1;
+  insta.common.User user = 2;
+}
+
+message LoginRequest {
+  string email_or_username = 1;
+  string password = 2;
+}
+
+message GetProfileRequest {
+  string user_id = 1;
+}
+
+message GetProfileResponse {
+  insta.common.User user = 1;
+}

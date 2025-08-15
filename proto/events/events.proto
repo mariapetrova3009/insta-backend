@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package insta.events;
+option go_package = "github.com/mariapetrova3009/insta-backend/proto/events;events";
+
+import "google/protobuf/timestamp.proto";
+
+message PostCreated {
+  string post_id = 1;
+  string author_id = 2;
+  google.protobuf.Timestamp created_at = 3;
+}
+
+message FollowCreated {
+  string follower_id = 1;
+  string followee_id = 2;
+  google.protobuf.Timestamp created_at = 3;
+}
+
+message LikeCreated {
+  string user_id = 1;
+  string post_id = 2;
+  google.protobuf.Timestamp created_at = 3;
+}
+
+message CommentCreated {
+  string id = 1;
+  string post_id = 2;
+  string user_id = 3;
+  google.protobuf.Timestamp created_at = 4;
+}

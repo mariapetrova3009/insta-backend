@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package insta.social;
+option go_package = "github.com/mariapetrova3009/insta-backend/proto/social;social";
+
+import "common.proto";
+
+service SocialGraphService {
+  // Subscription
+  rpc Follow(FollowRequest) returns (FollowResponse);
+  // Usubscribe
+  rpc Unfollow(FollowRequest) returns (insta.common.Empty);
+}
+
+service LikeService {
+  rpc Like(LikeRequest) returns (insta.common.Empty);
+  rpc Unlike(LikeRequest) returns (insta.common.Empty);
+}
+
+message FollowRequest {
+  string followee_id = 1; 
+}
+
+message FollowResponse {
+  string follower_id = 1;
+  string followee_id = 2;
+}
+
+message LikeRequest {
+  string post_id = 1;
+}

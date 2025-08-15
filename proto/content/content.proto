@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package insta.content;
+option go_package = "github.com/mariapetrova3009/insta-backend/proto/content;content";
+
+import "common.proto";
+
+service ContentService {
+  // Downloading file
+  rpc UploadMedia(UploadMediaRequest) returns (UploadMediaResponse);
+
+  // Create a post
+  rpc CreatePost(CreatePostRequest) returns (PostResponse);
+
+  // Get a post
+  rpc GetPost(GetPostRequest) returns (PostResponse);
+}
+
+message UploadMediaRequest {
+  bytes data = 1;   
+  string name = 2;   
+  string mime = 3;  
+}
+
+message UploadMediaResponse {
+  string media_path = 1; 
+  string name = 2;
+  string mime = 3;
+}
+
+message CreatePostRequest {
+  string caption = 1;
+  string media_path = 2;
+  string mime = 3;     
+}
+
+message GetPostRequest {
+  string post_id = 1;
+}
+
+message PostResponse {
+  insta.common.Post post = 1;
+}

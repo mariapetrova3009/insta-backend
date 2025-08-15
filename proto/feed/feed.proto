@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+
+package insta.feed;
+option go_package = "github.com/mariapetrova3009/insta-backend/proto/feed;feed";
+import "common.proto";
+
+service FeedService {
+    // Get a feed of posts
+    rpc GetFeed(GetFeedRequest) returns (GetFeedResponse);
+}
+
+message FeedEntry {
+  string user_id = 1;             // page owner
+  insta.common.Post post = 2;     // post
+}
+
+message GetFeedRequest {
+  insta.common.PageRequest page = 1; // limit + cursor
+}
+
+message GetFeedResponse {
+  repeated FeedEntry entries = 1;       // posts list
+  insta.common.PageInfo page_info = 2;  // info for pagination
+}

@@ -1,0 +1,19 @@
+log:
+  level: info
+  format: console
+
+redis:
+  addr: "localhost:6379"
+  db: 0
+
+kafka:
+  brokers: ["localhost:9092"]
+  group: "insta-backend-local"
+  topics:
+    post_created: "post.created"
+
+
+storage:
+  s3: false
+  upload_dir: "./var/uploads"
+  presign_ttl: 15m
