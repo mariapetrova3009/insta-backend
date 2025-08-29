@@ -1,7 +1,7 @@
 syntax = "proto3";
-
 package insta.common;
-option go_package = "github.com/mariapetrova3009/insta-backend/proto/common;comon";
+option go_package = "github.com/mariapetrova3009/insta-backend/proto/common;common";
+
 
 import "google/protobuf/timestamp.proto";
 

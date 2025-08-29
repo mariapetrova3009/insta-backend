@@ -1,10 +1,8 @@
 syntax = "proto3";
-
-
 package insta.identity;
 option go_package = "github.com/mariapetrova3009/insta-backend/proto/identity;identity";
 
-import "common.proto";
+import "common/common.proto";
 
 service IdentityService {
     rpc Register(RegisterRequest) returns (AuthResponse);

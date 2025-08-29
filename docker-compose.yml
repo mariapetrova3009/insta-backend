@@ -1,26 +1,32 @@
 version: "3.9"
 services:
   postgres:
-    image: postgres:16
+    image: postgres:17
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    ports: ["5432:5432"]
+      POSTGRES_USER: insta
+      POSTGRES_PASSWORD: insta
+      POSTGRES_DB: insta
+    ports:
+      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
 
-  redis:
-    image: redis:7
-    ports: ["6379:6379"]
-
-  redpanda: 
-    image: redpandadata/redpanda:latest
-    command:
-      - redpanda start --overprovisioned --smp 1 --memory 512M --reserve-memory 0M --check=false
+  content:
+    build:
+      context: .
+      dockerfile: services/content/Dockerfile
+    depends_on:
+      - postgres
+    environment:
+      # перетираем grpc.addr на :9082
+      CONTENT_GRPC_ADDR: ":9082"
+      # перетираем postgres.dsn (важно именно CONTENT_POSTGRES_DSN)
+      CONTENT_POSTGRES_DSN: "postgres://insta:insta@postgres:5432/insta?sslmode=disable"
+      CONTENT_STORAGE_UPLOAD_DIR: "/data"
+    volumes:
+      - ./data:/data
     ports:
-      - "9092:9092"
-      - "9644:9644"
+      - "9082:9082"
 
 volumes:
   pgdata:
-  
