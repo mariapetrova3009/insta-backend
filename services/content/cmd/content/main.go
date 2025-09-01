@@ -2,50 +2,105 @@ package main
 
 import (
 	"context"
+	"database/sql"
+	"log/slog"
 	"net"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
-	"github.com/mariapetrova3009/insta-backend/services/content/internal/server"
-
-	"github.com/mariapetrova3009/insta-backend/services/content/internal/storage"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 	cfgpkg "github.com/mariapetrova3009/insta-backend/pkg/config"
 	logpkg "github.com/mariapetrova3009/insta-backend/pkg/logger"
 	contentpb "github.com/mariapetrova3009/insta-backend/proto/content"
+	contentrepo "github.com/mariapetrova3009/insta-backend/services/content/internal/repo"
+	contentserver "github.com/mariapetrova3009/insta-backend/services/content/internal/server"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
-
-func must[T any](v T, err error) T {
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
 
 const service = "content"
 
 func main() {
-	// 1) загружаем конфиг
+	// config
 	cfg, err := cfgpkg.Load(service)
 	if err != nil {
 		panic(err)
 	}
 
+	// logger
 	log := logpkg.New(cfg.Env, service, cfg.Log.Level, cfg.Log.Format)
 	log.Info("starting")
 
-	// 2) подключение к базе
-	db := must(pgxpool.New(context.Background(), cfg.Postgres.DSN))
-	defer db.Close()
+	// connect to db
+	db, err := sql.Open("postgres", cfg.Postgres.DSN)
+	if err != nil {
+		panic(err)
+	}
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(time.Hour)
 
-	st := storage.NewLocalFS(cfg.Storage.UploadDir)
-	s := server.New(db, st)
+	// HTTP
 
-	// 3) gRPC
+	mux := http.NewServeMux()
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	})
+
+	httpSrv := &http.Server{
+		Addr:              cfg.HTTP.Addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	// gRPC
 	grpcSrv := grpc.NewServer()
-	contentpb.RegisterContentServiceServer(grpcSrv, s)
+	if cfg.Env != "prod" {
+		reflection.Register(grpcSrv)
+	}
 
-	lis := must(net.Listen("tcp", cfg.GRPC.Addr))
-	log.Info("grpc listen", "addr", cfg.GRPC.Addr)
-	must(0, grpcSrv.Serve(lis))
+	repo := contentrepo.NewRepo(db)
+	srv := contentserver.New(log, repo)
+	contentpb.RegisterContentServiceServer(grpcSrv, srv)
+
+	errCh := make(chan error, 2)
+
+	go func() {
+		log.Info("http listen", "addr", cfg.HTTP.Addr)
+		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			errCh <- err
+		}
+	}()
+
+	go func() {
+		lis, err := net.Listen("tcp", cfg.GRPC.Addr)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		log.Info("grpc listen", "addr", cfg.GRPC.Addr)
+		errCh <- grpcSrv.Serve(lis)
+	}()
+
+	// graceful shutdown
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+
+	select {
+	case err := <-errCh:
+		log.Error("server error", slog.Any("err", err))
+	case sig := <-stop:
+		log.Info("stopping", "signal", sig.String())
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	httpSrv.Shutdown(ctx)
+	grpcSrv.GracefulStop()
+	log.Info("stopped")
 }
