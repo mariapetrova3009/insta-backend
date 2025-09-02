@@ -27,4 +27,8 @@ func MustInit(cfg *cfgpkg.Config) *Clients {
 		idConn:   idConn, ctConn: ctConn, fdConn: fdConn,
 	}
 }
-func (c *Clients) Close() { _ = c.idConn.Close(); _ = c.ctConn.Close(); _ = c.fdConn.Close() }
+func (c *Clients) Close() {
+	_ = c.idConn.Close()
+	_ = c.ctConn.Close()
+	_ = c.fdConn.Close()
+}

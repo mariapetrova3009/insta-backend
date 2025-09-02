@@ -8,7 +8,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"strconv"
-	"strings"
 
 	gatewayauth "github.com/mariapetrova3009/insta-backend/services/gateway/internal/auth"
 	"github.com/mariapetrova3009/insta-backend/services/gateway/internal/clients"
@@ -19,7 +18,6 @@ import (
 	idpb "github.com/mariapetrova3009/insta-backend/proto/identity"
 )
 
-// Healthz: простая проверка живости
 func Healthz() http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -42,9 +40,10 @@ func Register(cl *clients.Clients) http.HandlerFunc {
 			httpError(w, http.StatusBadRequest, "bad json")
 			return
 		}
+
 		res, err := cl.Identity.Register(r.Context(), &idpb.RegisterRequest{
-			Email:    strings.TrimSpace(in.Email),
-			Username: strings.TrimSpace(in.Username),
+			Email:    in.Email,
+			Username: in.Username,
 			Password: in.Password,
 			Bio:      in.Bio,
 		})
@@ -54,6 +53,7 @@ func Register(cl *clients.Clients) http.HandlerFunc {
 		}
 		respondJSON(w, http.StatusOK, res)
 	}
+
 }
 
 func Login(cl *clients.Clients) http.HandlerFunc {
@@ -61,6 +61,7 @@ func Login(cl *clients.Clients) http.HandlerFunc {
 		EmailOrUsername string `json:"email_or_username"`
 		Password        string `json:"password"`
 	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		var in req
 		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
@@ -68,12 +69,11 @@ func Login(cl *clients.Clients) http.HandlerFunc {
 			return
 		}
 		res, err := cl.Identity.Login(r.Context(), &idpb.LoginRequest{
-			EmailOrUsername: strings.TrimSpace(in.EmailOrUsername),
+			EmailOrUsername: in.EmailOrUsername,
 			Password:        in.Password,
 		})
 		if err != nil {
 			httpError(w, http.StatusBadGateway, err.Error())
-			return
 		}
 		respondJSON(w, http.StatusOK, res)
 	}
@@ -94,9 +94,9 @@ func Me(cl *clients.Clients) http.HandlerFunc {
 }
 
 // --------------------------------- POSTS -------------------------------------
-
 func CreatePost(cl *clients.Clients) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// read autorization
 		if err := r.ParseMultipartForm(32 << 20); err != nil {
 			httpError(w, http.StatusBadRequest, "multipart form required")
 			return
@@ -109,34 +109,37 @@ func CreatePost(cl *clients.Clients) http.HandlerFunc {
 		}
 		defer file.Close()
 
+		// get caption and mime
+
 		caption := r.FormValue("caption")
-		mime := header.Header.Get("Content-Type")
+		mime := r.Header.Get("Content-Type")
 		if mime == "" {
 			mime = "application/octet-stream"
 		}
 
+		// read data
 		data, err := readAll(file)
 		if err != nil {
 			httpError(w, http.StatusBadRequest, "read file error")
-			return
 		}
 
-		// 1) upload media
-		up, err := cl.Content.UploadMedia(r.Context(), &contentpb.UploadMediaRequest{
-			Name: header.Filename,
-			Mime: mime,
+		// upload media
+
+		res, err := cl.Content.UploadMedia(r.Context(), &contentpb.UploadMediaRequest{
 			Data: data,
+			Mime: mime,
+			Name: header.Filename,
 		})
 		if err != nil {
 			httpError(w, http.StatusBadGateway, err.Error())
-			return
 		}
 
-		// 2) create post
+		// create post
+
 		cp, err := cl.Content.CreatePost(r.Context(), &contentpb.CreatePostRequest{
 			Caption:   caption,
-			MediaPath: up.MediaPath,
-			Mime:      up.Mime,
+			MediaPath: res.MediaPath,
+			Mime:      res.Mime,
 		})
 		if err != nil {
 			httpError(w, http.StatusBadGateway, err.Error())
@@ -155,21 +158,23 @@ func GetFeed(cl *clients.Clients) http.HandlerFunc {
 		limitStr := r.URL.Query().Get("limit")
 		cursor := r.URL.Query().Get("cursor")
 
-		if limitStr != "" || cursor != "" {
+		if limitStr == "" || cursor == "" {
 			page = &cmpb.PageRequest{}
-			if limitStr != "" {
-				if l, err := strconv.Atoi(limitStr); err == nil {
-					page.Limit = uint32(l)
-				}
-			}
-			if cursor != "" {
-				page.Cursor = &cmpb.Cursor{Token: cursor}
+		}
+		if limitStr != "" {
+			if l, err := strconv.Atoi(limitStr); err == nil {
+				page.Limit = uint32(l)
 			}
 		}
+		if cursor != "" {
+			page.Cursor = &cmpb.Cursor{Token: cursor}
+		}
 
-		res, err := cl.Feed.GetFeed(r.Context(), &feedpb.GetFeedRequest{Page: page})
+		res, err := cl.Feed.GetFeed(r.Context(), &feedpb.GetFeedRequest{
+			Page: page,
+		})
 		if err != nil {
-			httpError(w, http.StatusBadGateway, err.Error())
+			httpError(w, http.StatusBadRequest, err.Error())
 			return
 		}
 		respondJSON(w, http.StatusOK, res)
