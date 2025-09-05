@@ -123,9 +123,11 @@ func CreatePost(cl *clients.Clients) http.HandlerFunc {
 			httpError(w, http.StatusBadRequest, "read file error")
 		}
 
+		md := gatewayauth.MetadataFromHTTP(r)
+		ctx := gatewayauth.Outgoing(r.Context(), md)
 		// upload media
 
-		res, err := cl.Content.UploadMedia(r.Context(), &contentpb.UploadMediaRequest{
+		res, err := cl.Content.UploadMedia(ctx, &contentpb.UploadMediaRequest{
 			Data: data,
 			Mime: mime,
 			Name: header.Filename,
@@ -136,7 +138,7 @@ func CreatePost(cl *clients.Clients) http.HandlerFunc {
 
 		// create post
 
-		cp, err := cl.Content.CreatePost(r.Context(), &contentpb.CreatePostRequest{
+		cp, err := cl.Content.CreatePost(ctx, &contentpb.CreatePostRequest{
 			Caption:   caption,
 			MediaPath: res.MediaPath,
 			Mime:      res.Mime,

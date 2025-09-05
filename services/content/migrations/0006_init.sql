@@ -8,8 +8,8 @@ CREATE TABLE IF NOT EXISTS media (
 );
 
 ALTER TABLE posts
-  ADD COLUMN IF NOT EXISTS media_id uuid;
+  ADD COLUMN IF NOT EXISTS media_id uuid REFERENCES media(id);
 
-
+-- +goose Down
 ALTER TABLE posts DROP COLUMN IF EXISTS media_id;
 DROP TABLE IF EXISTS media;

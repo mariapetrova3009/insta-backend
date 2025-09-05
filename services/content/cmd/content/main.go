@@ -8,14 +8,17 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/confluentinc/confluent-kafka-go/kafka"
 	cfgpkg "github.com/mariapetrova3009/insta-backend/pkg/config"
 	logpkg "github.com/mariapetrova3009/insta-backend/pkg/logger"
 	contentpb "github.com/mariapetrova3009/insta-backend/proto/content"
 	contentrepo "github.com/mariapetrova3009/insta-backend/services/content/internal/repo"
 	contentserver "github.com/mariapetrova3009/insta-backend/services/content/internal/server"
+	contentstore "github.com/mariapetrova3009/insta-backend/services/content/internal/storage"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -63,7 +66,21 @@ func main() {
 	}
 
 	repo := contentrepo.NewRepo(db)
-	srv := contentserver.New(log, repo)
+	store := contentstore.NewLocalFS(cfg.Storage.UploadDir)
+	prod, err := kafka.NewProducer(&kafka.ConfigMap{
+		"bootstrap.servers":  strings.Join(cfg.Kafka.Brokers, ","),
+		"enable.idempotence": true,
+		"acks":               "all",
+		"linger.ms":          10,
+		"retries":            5,
+	})
+	if err != nil {
+		log.Error("kafka init", "err", err)
+		return
+	}
+	defer prod.Close()
+
+	srv := contentserver.New(log, repo, store, prod, cfg.Kafka.Topics.PostCreated)
 	contentpb.RegisterContentServiceServer(grpcSrv, srv)
 
 	errCh := make(chan error, 2)
