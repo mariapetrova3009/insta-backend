@@ -8,14 +8,17 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/confluentinc/confluent-kafka-go/kafka"
 	cfgpkg "github.com/mariapetrova3009/insta-backend/pkg/config"
 	logpkg "github.com/mariapetrova3009/insta-backend/pkg/logger"
 	fdpb "github.com/mariapetrova3009/insta-backend/proto/feed"
 	feedsvc "github.com/mariapetrova3009/insta-backend/services/feed/internal/feed"
 
+	_ "github.com/lib/pq"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -41,6 +44,18 @@ func main() {
 	db.SetMaxIdleConns(5)
 	db.SetConnMaxLifetime(time.Hour)
 
+	cons, err := kafka.NewConsumer(&kafka.ConfigMap{
+		"bootstrap.servers":  strings.Join(cfg.Kafka.Brokers, ","),
+		"group.id":           cfg.Kafka.Group, // напр. "feed-builder"
+		"auto.offset.reset":  "earliest",
+		"enable.auto.commit": false, // коммитим вручную после успешной обработки
+	})
+	if err != nil {
+		log.Error("kafka consumer init", "err", err)
+		return
+	}
+	defer cons.Close()
+
 	// HTTP /healthz
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -60,7 +75,7 @@ func main() {
 	}
 
 	repo := feedsvc.NewRepo(db)
-	srv := feedsvc.New(log, repo)
+	srv := feedsvc.New(log, repo, cons, cfg.Kafka.Topics.PostCreated)
 	fdpb.RegisterFeedServiceServer(grpcSrv, srv)
 
 	// run services
@@ -83,6 +98,10 @@ func main() {
 		errCh <- grpcSrv.Serve(lis)
 	}()
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go srv.RunConsumer(ctx)
+
 	// graceful shutdown
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
@@ -94,7 +113,7 @@ func main() {
 		log.Error("server error", slog.Any("err", err))
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	_ = httpSrv.Shutdown(ctx)
 	grpcSrv.GracefulStop()

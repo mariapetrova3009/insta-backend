@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v5"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -23,8 +23,7 @@ func MetadataFromHTTP(r *http.Request) metadata.MD {
 	if uid, ok := r.Context().Value("user-id").(string); ok && uid != "" {
 		md.Set("user-id", uid)
 	}
-
-	return metadata.Pairs("authorization", a)
+	return md // <— было metadata.Pairs(...)
 }
 
 // connect context with metadata

@@ -3,12 +3,14 @@ package feed
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/confluentinc/confluent-kafka-go/kafka"
 	cmpb "github.com/mariapetrova3009/insta-backend/proto/common"
 	fdpb "github.com/mariapetrova3009/insta-backend/proto/feed"
 	"google.golang.org/grpc/codes"
@@ -25,13 +27,71 @@ type Server struct {
 	fdpb.UnimplementedFeedServiceServer
 	log *slog.Logger
 
-	repo *Repo
+	repo             *Repo
+	cons             *kafka.Consumer
+	topicPostCreated string
 }
 
-func New(log *slog.Logger, repo *Repo) *Server {
+func New(log *slog.Logger, repo *Repo, cons *kafka.Consumer, topic string) *Server {
 	return &Server{
-		log:  log,
-		repo: repo,
+		log:              log,
+		repo:             repo,
+		cons:             cons,
+		topicPostCreated: topic,
+	}
+}
+
+type postCreated struct {
+	PostID      string `json:"post_id"`
+	AuthorID    string `json:"author_id"`
+	Caption     string `json:"caption"`
+	MediaPath   string `json:"media_path"`
+	Mime        string `json:"mime"`
+	CreatedAtMs int64  `json:"created_at_ms"`
+}
+
+func (s *Server) RunConsumer(ctx context.Context) {
+	if s.cons == nil || s.topicPostCreated == "" {
+		return
+	}
+
+	if err := s.cons.Subscribe(s.topicPostCreated, nil); err != nil {
+		s.log.Error("kafka subscribe failed", "err", err)
+		return
+	}
+
+	s.log.Info("kafka consuming", "topic", s.topicPostCreated)
+
+	for {
+		select {
+		case <-ctx.Done():
+			s.log.Info("consumer stop")
+			return
+		default:
+			msg, err := s.cons.ReadMessage(250 * time.Millisecond) // 250ms poll
+			if err != nil {                                        // timeout/err — просто продолжим
+				// можно логировать только fatals: if kafkaErr, ok := err.(kafka.Error); ok && kafkaErr.IsFatal()
+				continue
+			}
+
+			var evt postCreated
+			if err := json.Unmarshal(msg.Value, &evt); err != nil {
+				s.log.Error("bad event json", "err", err)
+				continue
+			}
+
+			// фан-аут поста подписчикам
+			createdAt := time.UnixMilli(evt.CreatedAtMs).UTC()
+			if err := s.repo.FanoutPost(context.Background(), evt.AuthorID, evt.PostID, createdAt); err != nil {
+				s.log.Error("fanout failed", "err", err)
+				continue
+			}
+
+			// коммитим offset (ручной commit)
+			if _, err := s.cons.CommitMessage(msg); err != nil {
+				s.log.Warn("commit failed", "err", err)
+			}
+		}
 	}
 }
 

@@ -6,27 +6,24 @@ services:
       POSTGRES_USER: insta
       POSTGRES_PASSWORD: insta
       POSTGRES_DB: insta
-    ports:
-      - "5432:5432"
+    ports: ["5432:5432"]
     volumes:
       - pgdata:/var/lib/postgresql/data
 
-  content:
-    build:
-      context: .
-      dockerfile: services/content/Dockerfile
-    depends_on:
-      - postgres
+  redpanda:
+    image: redpandadata/redpanda:v24.1.9
+    command:
+      - redpanda start --overprovisioned --smp 1 --memory 512M --reserve-memory 0M
+        --kafka-addr PLAINTEXT://0.0.0.0:9092
+        --advertise-kafka-addr PLAINTEXT://redpanda:9092
+    ports: ["9092:9092"]
+
+  console:
+    image: redpandadata/console:latest
     environment:
-      # перетираем grpc.addr на :9082
-      CONTENT_GRPC_ADDR: ":9082"
-      # перетираем postgres.dsn (важно именно CONTENT_POSTGRES_DSN)
-      CONTENT_POSTGRES_DSN: "postgres://insta:insta@postgres:5432/insta?sslmode=disable"
-      CONTENT_STORAGE_UPLOAD_DIR: "/data"
-    volumes:
-      - ./data:/data
-    ports:
-      - "9082:9082"
+      - KAFKA_BROKERS=redpanda:9092
+    ports: ["8081:8080"]
+    depends_on: [redpanda]
 
 volumes:
   pgdata:

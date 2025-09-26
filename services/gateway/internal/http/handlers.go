@@ -96,12 +96,13 @@ func Me(cl *clients.Clients) http.HandlerFunc {
 // --------------------------------- POSTS -------------------------------------
 func CreatePost(cl *clients.Clients) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// read autorization
+		// 0) multipart
 		if err := r.ParseMultipartForm(32 << 20); err != nil {
 			httpError(w, http.StatusBadRequest, "multipart form required")
 			return
 		}
 
+		// 1) файл
 		file, header, err := r.FormFile("file")
 		if err != nil {
 			httpError(w, http.StatusBadRequest, "file is required")
@@ -109,24 +110,25 @@ func CreatePost(cl *clients.Clients) http.HandlerFunc {
 		}
 		defer file.Close()
 
-		// get caption and mime
-
-		caption := r.FormValue("caption")
-		mime := r.Header.Get("Content-Type")
-		if mime == "" {
-			mime = "application/octet-stream"
-		}
-
-		// read data
 		data, err := readAll(file)
 		if err != nil {
 			httpError(w, http.StatusBadRequest, "read file error")
+			return
 		}
 
+		// 2) caption + mime
+		caption := r.FormValue("caption")
+
+		mime := header.Header.Get("Content-Type")
+		if mime == "" {
+			mime = http.DetectContentType(data)
+		}
+
+		// 3) gRPC metadata (Authorization + user-id)
 		md := gatewayauth.MetadataFromHTTP(r)
 		ctx := gatewayauth.Outgoing(r.Context(), md)
-		// upload media
 
+		// 4) upload media
 		res, err := cl.Content.UploadMedia(ctx, &contentpb.UploadMediaRequest{
 			Data: data,
 			Mime: mime,
@@ -134,10 +136,10 @@ func CreatePost(cl *clients.Clients) http.HandlerFunc {
 		})
 		if err != nil {
 			httpError(w, http.StatusBadGateway, err.Error())
+			return // ← обязательно!
 		}
 
-		// create post
-
+		// 5) create post
 		cp, err := cl.Content.CreatePost(ctx, &contentpb.CreatePostRequest{
 			Caption:   caption,
 			MediaPath: res.MediaPath,
@@ -152,13 +154,17 @@ func CreatePost(cl *clients.Clients) http.HandlerFunc {
 	}
 }
 
-// ---------------------------------- FEED -------------------------------------
+// FEED
 
 func GetFeed(cl *clients.Clients) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var page *cmpb.PageRequest
 		limitStr := r.URL.Query().Get("limit")
 		cursor := r.URL.Query().Get("cursor")
+
+		page = &cmpb.PageRequest{}
+		limitStr = r.URL.Query().Get("limit")
+		cursor = r.URL.Query().Get("cursor")
 
 		if limitStr == "" || cursor == "" {
 			page = &cmpb.PageRequest{}

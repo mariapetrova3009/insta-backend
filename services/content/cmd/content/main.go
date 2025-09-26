@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
+	_ "github.com/lib/pq"
 	cfgpkg "github.com/mariapetrova3009/insta-backend/pkg/config"
 	logpkg "github.com/mariapetrova3009/insta-backend/pkg/logger"
 	contentpb "github.com/mariapetrova3009/insta-backend/proto/content"
@@ -67,6 +68,8 @@ func main() {
 
 	repo := contentrepo.NewRepo(db)
 	store := contentstore.NewLocalFS(cfg.Storage.UploadDir)
+
+	// add kafka
 	prod, err := kafka.NewProducer(&kafka.ConfigMap{
 		"bootstrap.servers":  strings.Join(cfg.Kafka.Brokers, ","),
 		"enable.idempotence": true,
@@ -84,6 +87,14 @@ func main() {
 	contentpb.RegisterContentServiceServer(grpcSrv, srv)
 
 	errCh := make(chan error, 2)
+
+	go func() {
+		for e := range prod.Events() {
+			if m, ok := e.(*kafka.Message); ok && m.TopicPartition.Error != nil {
+				log.Error("delivery failed", "err", m.TopicPartition.Error)
+			}
+		}
+	}()
 
 	go func() {
 		log.Info("http listen", "addr", cfg.HTTP.Addr)

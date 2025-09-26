@@ -78,7 +78,7 @@ func (r *Repo) GetFeed(ctx context.Context, userID string, limit uint32, offset 
 	where := ""
 	if userID != "" {
 		where = "WHERE user_id = $3"
-		args = []any{limit, offset, where}
+		args = []any{limit, offset, userID}
 	}
 	rows, err := r.DB.QueryContext(ctx, fmt.Sprintf(q, where), args...)
 	if err != nil {
