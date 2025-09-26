@@ -9,8 +9,8 @@ import (
 )
 
 func Load(service string) (*Config, error) {
-	env := getenv("APP_ENV", "local")         // local|dev|prod …
-	cfgDir := getenv("CONFIG_DIR", "configs") // где лежат yaml'ы
+	env := getenv("APP_ENV", "local")
+	cfgDir := getenv("CONFIG_DIR", "configs")
 
 	v := viper.New()
 	v.SetConfigType("yaml")
@@ -23,7 +23,7 @@ func Load(service string) (*Config, error) {
 	// 1) base.yaml (общие настройки)
 	basePath := filepath.Join(cfgDir, "base.yaml")
 	v.SetConfigFile(basePath)
-	_ = v.ReadInConfig() // норм, если файла нет
+	_ = v.ReadInConfig()
 
 	// 2) <service>/<env>.yaml (частные настройки)
 	svcPath := filepath.Join(cfgDir, strings.ToLower(service), env+".yaml")

@@ -77,7 +77,7 @@ func (s *Server) CreatePost(ctx context.Context, in *contentpb.CreatePostRequest
 		}
 		if authorID == uuid.Nil {
 			s.log.Warn("author_id is empty; feed may not be able to attribute the post")
-			// при желании тут можно вернуть ошибку: return nil, status.Error(codes.Unauthenticated, "no user")
+
 		}
 	}
 
@@ -99,7 +99,7 @@ func (s *Server) CreatePost(ctx context.Context, in *contentpb.CreatePostRequest
 
 	// TODO: Kafka
 
-	// сформировать событие
+	// событие
 	evt := struct {
 		PostID      string `json:"post_id"`
 		AuthorID    string `json:"author_id,omitempty"`
@@ -139,7 +139,6 @@ func (s *Server) CreatePost(ctx context.Context, in *contentpb.CreatePostRequest
 
 		if err != nil {
 			s.log.Error("kafka produce failed", "err", err)
-			// на MVP можно просто залогировать; в проде — outbox + DLQ
 		}
 	}
 

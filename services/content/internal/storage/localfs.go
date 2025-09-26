@@ -54,7 +54,6 @@ func (s *LocalFS) Put(name string, data []byte, _ string) (PutResult, error) {
 	return PutResult{Key: clean, Size: size}, nil
 }
 
-// Delete удаляет файл по ОТНОСИТЕЛЬНОМУ ключу.
 func (s *LocalFS) Delete(key string) error {
 	clean := filepath.Clean(key)
 	full := filepath.Join(s.root, clean)

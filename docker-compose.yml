@@ -6,24 +6,39 @@ services:
       POSTGRES_USER: insta
       POSTGRES_PASSWORD: insta
       POSTGRES_DB: insta
-    ports: ["5432:5432"]
+    ports:
+      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
 
   redpanda:
     image: redpandadata/redpanda:v24.1.9
     command:
-      - redpanda start --overprovisioned --smp 1 --memory 512M --reserve-memory 0M
-        --kafka-addr PLAINTEXT://0.0.0.0:9092
-        --advertise-kafka-addr PLAINTEXT://redpanda:9092
-    ports: ["9092:9092"]
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp
+      - "1"
+      - --memory
+      - 512M
+      - --reserve-memory
+      - 0M
+      - --kafka-addr
+      - PLAINTEXT://0.0.0.0:9092,OUTSIDE://0.0.0.0:19092
+      - --advertise-kafka-addr
+      - PLAINTEXT://redpanda:9092,OUTSIDE://localhost:19092
+    ports:
+      - "9092:9092"     # для контейнеров (console и т.п.)
+      - "19092:19092"   # для локальных процессов на хосте
 
   console:
     image: redpandadata/console:latest
     environment:
       - KAFKA_BROKERS=redpanda:9092
-    ports: ["8081:8080"]
-    depends_on: [redpanda]
+    ports:
+      - "8081:8080"
+    depends_on:
+      - redpanda
 
 volumes:
   pgdata:

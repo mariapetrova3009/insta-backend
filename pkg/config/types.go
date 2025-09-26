@@ -6,8 +6,8 @@ type Config struct {
 	Env string `mapstructure:"-"`
 
 	Log struct {
-		Level  string `mapstructure:"level"`  // debug|info|warn|error
-		Format string `mapstructure:"format"` // console|json
+		Level  string `mapstructure:"level"`
+		Format string `mapstructure:"format"`
 	} `mapstructure:"log"`
 
 	GRPC struct {
@@ -43,7 +43,7 @@ type Config struct {
 		RefreshTTL time.Duration `mapstructure:"refresh_ttl"`
 	} `mapstructure:"jwt"`
 
-	// Хранилище медиа (использует сервис content)
+	// Хранилище медиа
 	Storage struct {
 		UploadDir  string        `mapstructure:"upload_dir"`
 		S3         bool          `mapstructure:"s3"`
@@ -54,7 +54,7 @@ type Config struct {
 		PresignTTL time.Duration `mapstructure:"presign_ttl"`
 	} `mapstructure:"storage"`
 
-	// Эндпоинты других сервисов (нужно, например, в gateway)
+	// Эндпоинты других сервисов
 	Identity struct {
 		Endpoint string `mapstructure:"endpoint"`
 	} `mapstructure:"identity"`
